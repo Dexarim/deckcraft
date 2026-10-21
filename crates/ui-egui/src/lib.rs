@@ -11,6 +11,7 @@ pub mod backstage;
 pub mod canvas;
 pub mod control;
 pub mod credits;
+pub mod desktop_menu;
 pub mod dialogs;
 pub mod doc_window;
 pub mod eyedropper;
@@ -238,6 +239,8 @@ pub enum ViewMode {
 #[serde(default, rename_all = "camelCase")]
 pub struct UiState {
     pub brightness: theme::Brightness,
+    /// Follow the desktop while retaining explicit light/dark choices in old preferences.
+    pub system_theme: bool,
     pub tab: String,
     pub ribbon_collapsed: bool,
     pub view: ViewMode,
@@ -280,6 +283,7 @@ impl Default for UiState {
     fn default() -> Self {
         UiState {
             brightness: theme::Brightness::Light,
+            system_theme: false,
             tab: "Home".into(),
             ribbon_collapsed: false,
             view: ViewMode::Normal,
@@ -377,6 +381,7 @@ pub const UI_COMMANDS: &[(&str, &str, Option<&str>, &str)] = &[
     ("view.tab", "Ribbon Tab", None, "{tab}"),
     ("view.collapseRibbon", "Collapse the Ribbon", Some("Cmd+F1"), "{}"),
     ("view.dark", "Dark Mode", None, "{on?: bool}"),
+    ("view.theme", "Appearance", None, "{mode: system|light|dark}"),
     ("view.grayscale", "Grayscale", None, "{on?: bool}"),
     ("view.newWindow", "New Window", None, "{on?: bool, slide?: index, delta?: int}"),
     ("show.start", "Slide Show", Some("F5"), "{from?: index, custom?: name}"),
@@ -432,6 +437,19 @@ struct AnimPreview {
     timeline: deckcraft_anim::Timeline,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum DesktopClipboard {
+    Copy,
+    Cut,
+    Paste,
+}
+
+impl DesktopClipboard {
+    fn matches(self, event: &egui::Event) -> bool {
+        matches!((self, event), (Self::Copy, egui::Event::Copy) | (Self::Cut, egui::Event::Cut) | (Self::Paste, egui::Event::Paste(_)))
+    }
+}
+
 pub struct SlideApp {
     /// Table Design's border pen (`color`, `width`, `dash` for `table.borders`).
     pub table_pen: serde_json::Value,
@@ -478,11 +496,16 @@ pub struct SlideApp {
     pending_urls: Vec<String>,
     /// Text for the system clipboard from a Copy or Cut command, handed over on the next frame.
     pending_copy: Option<String>,
+    /// A native-menu Paste waits one frame for the toolkit's text event before image fallback.
+    desktop_paste: Option<(u64, u64)>,
+    desktop_clipboard: Vec<(u64, u64, DesktopClipboard)>,
     shot_token: u64,
     queued_shots: Vec<(u64, f64, u32)>,
     pending_shots: Vec<(u64, Option<String>, Sender<ControlResponse>, f64)>,
     styled: bool,
     restyle: bool,
+    /// Optional portal answer supplied by the desktop host; no bus access in the UI model.
+    desktop_dark: Option<bool>,
     fonts_ready: bool,
     last_time: f64,
     /// When AutoRecover data was last written (seconds, egui time).
@@ -561,11 +584,14 @@ impl SlideApp {
             backstage: None,
             pending_urls: vec![],
             pending_copy: None,
+            desktop_paste: None,
+            desktop_clipboard: vec![],
             shot_token: 0,
             queued_shots: vec![],
             pending_shots: vec![],
             styled: false,
             restyle: true,
+            desktop_dark: None,
             fonts_ready: false,
             last_time: 0.0,
             last_recovery: 0.0,
@@ -945,6 +971,18 @@ impl SlideApp {
             "view.dark" => {
                 let on = self.flag(p, self.ui.brightness == theme::Brightness::Dark);
                 self.ui.brightness = if on { theme::Brightness::Dark } else { theme::Brightness::Light };
+                self.ui.system_theme = false;
+                self.restyle = true;
+            }
+            "view.theme" => {
+                match p.get("mode").and_then(Value::as_str) {
+                    Some("system") => self.ui.system_theme = true,
+                    Some(mode @ ("light" | "dark")) => {
+                        self.ui.system_theme = false;
+                        self.ui.brightness = if mode == "dark" { theme::Brightness::Dark } else { theme::Brightness::Light };
+                    }
+                    _ => return Err("appearance mode must be system, light, or dark".into()),
+                }
                 self.restyle = true;
             }
             "view.grayscale" => self.ui.grayscale = self.flag(p, self.ui.grayscale),
@@ -1536,8 +1574,39 @@ impl SlideApp {
         }
     }
 
+    /// Supply the desktop appearance without overriding an explicit application theme.
+    pub fn set_desktop_dark(&mut self, dark: Option<bool>) {
+        self.desktop_dark = dark;
+    }
+
+    pub(crate) fn request_desktop_clipboard(&mut self, ctx: &egui::Context, kind: DesktopClipboard) {
+        if let Some(doc) = self.session.active() {
+            let frame = ctx.cumulative_frame_nr();
+            self.desktop_clipboard.push((frame, doc.uid, kind));
+            if matches!(kind, DesktopClipboard::Paste) {
+                self.desktop_paste = Some((frame, doc.uid));
+            }
+            ctx.send_viewport_cmd(match kind {
+                DesktopClipboard::Copy => egui::ViewportCommand::RequestCopy,
+                DesktopClipboard::Cut => egui::ViewportCommand::RequestCut,
+                DesktopClipboard::Paste => egui::ViewportCommand::RequestPaste,
+            });
+            ctx.request_repaint();
+        }
+    }
+
     /// Per-frame logic before layout: styles, control requests, screenshots, shortcuts.
     pub fn logic(&mut self, ctx: &egui::Context) {
+        if self.ui.system_theme {
+            let dark = self.desktop_dark.or_else(|| ctx.system_theme().map(|theme| theme == egui::Theme::Dark));
+            if let Some(dark) = dark {
+                let brightness = if dark { theme::Brightness::Dark } else { theme::Brightness::Light };
+                if brightness != self.ui.brightness {
+                    self.ui.brightness = brightness;
+                    self.restyle = true;
+                }
+            }
+        }
         let scale = self.ui.ui_scale.clamp(0.5, 3.0);
         if (ctx.zoom_factor() - scale).abs() > 1e-3 {
             ctx.set_zoom_factor(scale);
@@ -1600,6 +1669,21 @@ impl SlideApp {
             }
         }
         canvas::trackpad_twist(self, ctx);
+        let clipboard_blocked = desktop_menu::blocked(self);
+        for &(_, document, kind) in &self.desktop_clipboard {
+            if self.session.active().is_none_or(|d| d.uid != document) || clipboard_blocked {
+                // Guard native Copy/Cut/Paste before an egui text editor can consume it. Keep
+                // same-frame requests until the next frame, when eframe delivers the event.
+                ctx.input_mut(|input| input.events.retain(|event| !kind.matches(event)));
+            }
+        }
+        self.desktop_clipboard.retain(|(frame, _, _)| ctx.cumulative_frame_nr() <= *frame);
+        if let Some((frame, document)) = self.desktop_paste
+            && (self.session.active().is_none_or(|d| d.uid != document) || clipboard_blocked)
+            && ctx.cumulative_frame_nr() > frame
+        {
+            self.desktop_paste = None;
+        }
     }
 
     /// Borrow faces for interface text in scripts the interface fonts lack (#101): the open
@@ -1681,6 +1765,16 @@ impl SlideApp {
                 }
                 _ => {}
             }
+        }
+        if events.iter().any(|event| matches!(event, egui::Event::Paste(_))) {
+            self.desktop_paste = None;
+        } else if let Some((frame, document)) = self.desktop_paste
+            && ctx.cumulative_frame_nr() > frame
+        {
+            self.desktop_paste = None;
+            // eframe emits no Paste for an image-only clipboard. Wait until its requested text
+            // event had a chance to arrive; never paste a second object after a normal Paste.
+            image_paste |= self.session.active().is_some_and(|d| d.uid == document);
         }
         if ctx.memory(|m| m.focused().is_some()) || self.dialog.as_ref().is_some_and(|d| d.modal()) || self.palette.is_some() {
             return;

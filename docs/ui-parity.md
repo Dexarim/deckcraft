@@ -1,6 +1,6 @@
 # UI parity with PowerPoint
 
-> **Last reviewed:** 2026-10-14 · **Last updated:** 2026-10-14 · **Change:** major (community PR wave 2026-10-14: 14 new dialogs (41 in all), Eyedropper, Export button, New Window, Grid Options, WordArt gallery and handles, Slide Sorter sections, Quick Access Toolbar, Format Background and Format Shape depth, rich-text clipboard; duplicated rows and headers folded; previous: minor, File tab / Backstage, #76) · **Target:** Microsoft PowerPoint for Mac 16.113 (Microsoft 365)
+> **Last reviewed:** 2026-10-21 · **Last updated:** 2026-10-21 · **Change:** minor (Linux system appearance, scrollable narrow ribbon and retained clipboard owner; live verification tracked separately) · **Target:** Microsoft PowerPoint for Mac 16.113 (Microsoft 365)
 
 How DeckCraft looks and feels next to PowerPoint: the shell, the ribbon, menus, panes, dialogs,
 direct manipulation, keyboard and precision. Observations of PowerPoint are kept locally in
@@ -15,6 +15,10 @@ Typing gives the marker its normal text color. These temporary markers are hidde
 ends and are omitted from thumbnails, slide shows and exports.
 
 ## Shell
+
+Linux integration update (2026-10-21): the tab strip and ribbon groups scroll when narrow;
+system appearance is an optional persisted preference without overriding old explicit themes.
+Native Linux decorations are retained. See [KDE.md](KDE.md) for the separate live-test checklist.
 
 | Element | PowerPoint for Mac | DeckCraft | Gap |
 |---|---|---|---|
@@ -162,6 +166,9 @@ consistency is open (#73, #56).
 | **Total** | **~26–46** |
 
 ## Revision history
+
+2026-10-21: Linux ribbon overflow, system appearance preference and clipboard-owner lifetime;
+automated regression coverage added, compositor verification is not implied.
 
 | Date | Change | Summary |
 |---|---|---|

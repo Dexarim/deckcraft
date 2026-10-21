@@ -129,6 +129,11 @@ app's JSON control channel (`deckcraft --control PORT`).
 
 ## Progress log
 
+Linux integration update (2026-10-21): fractional-scale ribbon overflow handling, explicit
+system appearance with backwards-compatible preferences, retained clipboard ownership and
+native Linux decoration hints. See [KDE verification](docs/KDE.md); existing parity estimates
+are unchanged and live compositor checks are tracked separately.
+
 | Date | What landed |
 |---|---|
 | 2026-10-18 | Native chart sidecar bytes move from JSON arrays into referenced ZIP entries, with shared media byte/item limits and bounded reads; older inline sidecars still load. Synthetic format regressions cover large workbooks and malformed members |
