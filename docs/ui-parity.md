@@ -1,6 +1,6 @@
 # UI parity with PowerPoint
 
-> **Last reviewed:** 2026-10-21 · **Last updated:** 2026-10-21 · **Change:** minor (Linux system appearance, scrollable narrow ribbon and retained clipboard owner; live verification tracked separately) · **Target:** Microsoft PowerPoint for Mac 16.113 (Microsoft 365)
+> **Last reviewed:** 2026-10-21 · **Last updated:** 2026-10-22 · **Change:** minor (Linux system appearance, scrollable narrow ribbon and retained clipboard owner; live verification tracked separately) · **Target:** Microsoft PowerPoint for Mac 16.113 (Microsoft 365)
 
 How DeckCraft looks and feels next to PowerPoint: the shell, the ribbon, menus, panes, dialogs,
 direct manipulation, keyboard and precision. Observations of PowerPoint are kept locally in
@@ -32,7 +32,7 @@ Native Linux decorations are retained. See [KDE.md](KDE.md) for the separate liv
 | Start screen: new, themes, templates, recent, open | yes, the same page as File › Home | yes: File › Home with Home, New, Open, Account and Options (#76) | |
 | Status bar: slide counter, language, notes, comments, views, zoom slider | yes | yes | |
 | Command search (Tell Me) | yes | command palette | |
-| Light / dark appearance | follows the system | light or dark; doesn't follow the system (#41) | 1–2 h |
+| Light / dark appearance | follows the system | System, Light or Dark (File › Account, Preferences, View › Appearance); System follows the desktop portal on Linux and egui's system theme elsewhere (#41) | physical theme transitions and packaged desktop checks remain |
 | One window per presentation, New Window, Arrange All | yes | New Window opens one more window on the same presentation (its own slide, live with edits); tabs stay in the first window; no Arrange All | Arrange All |
 | Quick Access Toolbar customization | yes | yes: Customize menu (common commands, reset), right-click any ribbon button to add, right-click a toolbar button to remove; saved with the UI state | done |
 
@@ -167,11 +167,10 @@ consistency is open (#73, #56).
 
 ## Revision history
 
-2026-10-21: Linux ribbon overflow, system appearance preference and clipboard-owner lifetime;
-automated regression coverage added, compositor verification is not implied.
-
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-22 | trivial | Review follow-up: align the Shell appearance row with System/Light/Dark and use revision-table entries |
+| 2026-10-21 | minor | Linux ribbon overflow, System appearance and clipboard-owner lifetime; regression coverage added, full compositor acceptance not implied |
 | 2026-10-16 | minor | Export › Change File Type › PNG and the Export… dialog offer a transparent background (#784) |
 | 2026-10-14 | minor | Gray list markers on empty paragraphs while editing; caret keeps the list indent before typing |
 | 2026-10-14 | minor | Community PR wave folded: one row each for Format Shape, Dialogs (41, listed from `dialogs.rs`), Animation Pane (timeline is in), window, Quick Access Toolbar, Format Background, rulers, image paste, context menus, exact size and edit points; estimates re-totalled (~26–46 h) |

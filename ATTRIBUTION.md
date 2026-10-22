@@ -12,10 +12,6 @@ Licence: Apache-2.0, retained in `vendor/winit/LICENSE`.
 | `vendor/winit/examples/data/gradient.png` | winit contributors | https://github.com/rust-windowing/winit/blob/v0.30.13/examples/data/gradient.png | Apache-2.0 | Upstream source example/documentation |
 | `vendor/winit/examples/data/cross2.png` | winit contributors | https://github.com/rust-windowing/winit/blob/v0.30.13/examples/data/cross2.png | Apache-2.0 | Upstream source example/documentation |
 | `vendor/winit/examples/data/cross.png` | winit contributors | https://github.com/rust-windowing/winit/blob/v0.30.13/examples/data/cross.png | Apache-2.0 | Upstream source example/documentation |
-| `vendor/winit/docs/res/keyboard_standard_1_key.svg` | winit contributors | https://github.com/rust-windowing/winit/blob/v0.30.13/docs/res/keyboard_standard_1_key.svg | Apache-2.0 | Upstream source example/documentation |
-| `vendor/winit/docs/res/keyboard_right_shift_key.svg` | winit contributors | https://github.com/rust-windowing/winit/blob/v0.30.13/docs/res/keyboard_right_shift_key.svg | Apache-2.0 | Upstream source example/documentation |
-| `vendor/winit/docs/res/keyboard_numpad_1_key.svg` | winit contributors | https://github.com/rust-windowing/winit/blob/v0.30.13/docs/res/keyboard_numpad_1_key.svg | Apache-2.0 | Upstream source example/documentation |
-| `vendor/winit/docs/res/keyboard_left_shift_key.svg` | winit contributors | https://github.com/rust-windowing/winit/blob/v0.30.13/docs/res/keyboard_left_shift_key.svg | Apache-2.0 | Upstream source example/documentation |
 
 
 Every asset DeckCraft includes, bundles, embeds at build time or shows in its documentation, with
