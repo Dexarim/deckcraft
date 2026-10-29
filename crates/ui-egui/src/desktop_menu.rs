@@ -204,14 +204,14 @@ mod tests {
     }
 
     #[test]
-    fn desktop_menu_paste_image_fallback_is_deferred_and_never_duplicates_text() {
+    fn desktop_menu_native_image_delivery_is_deferred_and_never_duplicates_text() {
         let session = deckcraft_engine::Session::with_new();
         let png = deckcraft_engine::cmd::file::render_png(&session.active().unwrap().doc, 0, 0.1, false).0;
         let services = crate::Services { clipboard_image: Some(Box::new(move || Some(png.clone()))), ..Default::default() };
         let mut h = egui_kittest::Harness::builder().build_ui_state(
             |ui, app: &mut SlideApp| {
                 app.logic(ui.ctx());
-                app.keyboard(ui.ctx());
+                app.ui(ui);
             },
             SlideApp::new(session, services),
         );
@@ -227,13 +227,18 @@ mod tests {
         h.run_steps(3);
         assert_eq!(pictures(h.state()), 0, "normal text Paste suppresses the image fallback");
         activate(h.state_mut(), &ctx, doc, &paste);
-        assert_eq!(pictures(h.state()), 0, "do not read images before the text event can arrive");
+        assert_eq!(pictures(h.state()), 0, "do not guess the host's asynchronous result");
+        h.run_steps(8);
+        assert_eq!(pictures(h.state()), 0, "no synchronous fallback while native transfer is pending");
+        h.event(egui::Event::PasteImage(std::sync::Arc::new(egui::ColorImage::new([1, 1], vec![egui::Color32::RED]))));
         h.run_steps(3);
-        assert_eq!(pictures(h.state()), 1);
+        assert_eq!(pictures(h.state()), 1, "native image delivery must suppress the services fallback");
         h.run_steps(3);
-        assert_eq!(pictures(h.state()), 1, "fallback is one-shot");
+        assert_eq!(pictures(h.state()), 1, "native image delivery is one-shot");
         activate(h.state_mut(), &ctx, doc, &paste);
         h.state_mut().run("file.new", json!({})).unwrap();
+        h.run_steps(8);
+        h.event(egui::Event::PasteImage(std::sync::Arc::new(egui::ColorImage::new([1, 1], vec![egui::Color32::RED]))));
         h.run_steps(3);
         assert_eq!(pictures(h.state()), 0, "a queued image cannot enter the replacement document");
 
@@ -262,6 +267,7 @@ mod tests {
             let mut h = egui_kittest::Harness::builder().build_ui_state(
                 |ui, (app, received): &mut (SlideApp, Vec<egui::Event>)| {
                     app.logic(ui.ctx());
+                    app.ui(ui);
                     // Observe the input where a TextEdit would consume it, after app logic.
                     received.extend(
                         ui.input(|i| i.events.iter().filter(|e| matches!(e, egui::Event::Copy | egui::Event::Cut)).cloned().collect::<Vec<_>>()),
@@ -271,7 +277,7 @@ mod tests {
             );
             h.run_steps(2);
             let ctx = h.ctx.clone();
-            ctx.memory_mut(|memory| memory.request_focus(egui::Id::new("clipboard_text_editor")));
+            ctx.memory_mut(|memory| memory.request_focus(egui::Id::unique("clipboard_text_editor")));
             let doc = document(&h.state().0);
             activate(&mut h.state_mut().0, &ctx, doc, &Action { command: command.into(), params: json!({}) });
             assert_eq!(h.state().0.desktop_clipboard.len(), 1, "focused text input must use the guarded deferred path");

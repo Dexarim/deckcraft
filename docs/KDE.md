@@ -1,6 +1,6 @@
 # KDE Plasma / Linux desktop integration
 
-Updated 2026-10-21. Integration checks and remaining limitations are recorded separately from
+Updated 2026-10-30. Integration checks and remaining limitations are recorded separately from
 features implemented in code; a successful build is not a Plasma GUI test.
 
 ## Global Menu
@@ -15,10 +15,19 @@ Enable Plasma's Global Menu widget in the desired panel manually. To disable exp
 launch, set `DECKCRAFT_NO_GLOBAL_MENU=1`; `KDE_NO_GLOBAL_MENU=1` is also respected. Display-server
 selection is intentionally unchanged: use `DECKCRAFT_WAYLAND=1` to test the native Wayland
 window separately from the default X11/XWayland path when `DISPLAY` is present.
+The reconciled winit fork includes native Wayland file-drop handling; interoperability
+with file managers still needs application/runtime verification.
 
 The root editing window exports the menu; fullscreen slideshow and secondary presenter windows
 do not receive the editor menu. Stale-document events and events during modal dialogs are
 discarded. Application-specific live Plasma verification remains separate from backend tests.
+
+Clipboard text and PNG transfers use the native eframe clipboard feature. Menu requests keep
+their document, selection and window identity until delivery or observed input cancellation;
+only one request per operation can be outstanding. A conflicting delivery is refused with a
+retry message because toolkit paste events do not carry application request identifiers.
+The adapter does not guess completion from a key release or a fixed number of frames.
+If a failed transfer returns no event, click back into the document before retrying the menu command.
 
 ## Appearance and window layout
 
@@ -50,10 +59,30 @@ Targeted regressions can be run with:
 CARGO_BUILD_JOBS=2 cargo test -p deckcraft -p deckcraft-ui-egui desktop_
 ```
 
-The optional sibling `craft-fonts` checkout is absent in the current development environment.
-Cargo reports the existing fallback-font warning; no fonts or manifests were substituted for
-verification. Its build script watches missing manifest paths, so consecutive Cargo commands
-may rebuild the font-dependent crates even when no source changed.
+For the 2026-10-29 reconciliation, the focused tests use the CI-pinned `craft-fonts`
+commit `37827adc41fd165f9a9234ac40f94dbad353aa69` with `CRAFT_FONTS_DIR` and
+`CRAFT_FONTS_REQUIRED=1`. Both manifests' 14 font hashes were verified. The 2026-10-21
+development run below used fallback fonts because the optional sibling checkout was absent.
+
+Reconciliation checks (2026-10-29): 20 focused host/UI regressions passed, including
+delayed native image delivery, stale document/selection/window rejection, synthetic-input
+and scroll cancellation boundaries, appearance migration and narrow-ribbon reachability.
+Workspace/all-targets Clippy, asset attribution, layering and PDF dependency checks passed.
+The existing ribbon harness rendered all five scales; all five captures were visually
+inspected. These are headless ribbon captures, not a physical mixed-monitor test.
+The exact WASM gate passed for all 23 selected crates using a matching extracted target
+sysroot. On 2026-10-30 the full `cargo xtask ci` passed all eight stages: formatting,
+PDF dependencies, workspace/all-targets Clippy, workspace tests (2,132 passed; six ignored),
+doctests (three passed), assets, layers and WASM. The run used one build job and two test
+threads with the pinned fonts above.
+
+Fresh native Wayland smoke (2026-10-30) used an isolated synthetic sample in the current
+Plasma session. The running application's DBusMenu exported Ruler unchecked; sending its
+`Event` changed the application's inspected ruler state from false to true and updated the
+exported checkmark. The native screenshot was inspected. The application exited normally
+with status zero, without forced termination, and its menu service disappeared. This verifies
+the exported action path in a real session, not physical interaction with the panel widget.
+It does not replace the manual mixed-DPI, live-theme, portal and clipboard checks below.
 
 Local automated result (2026-10-21): `cargo test --offline -p deckcraft -p deckcraft-ui-egui`
 passed all 36 host tests and 227 UI tests; four opt-in screenshot/long-soak tests stayed ignored.
